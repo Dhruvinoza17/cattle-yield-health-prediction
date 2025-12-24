@@ -1,0 +1,128 @@
+.sidebar {
+    width: 260px;
+    height: 100vh;
+    background-color: var(--bg-sidebar);
+    color: var(--text-light);
+    display: flex;
+    flex-direction: column;
+    position: fixed;
+    left: 0;
+    top: 0;
+    border-right: 1px solid rgba(255, 255, 255, 0.05);
+    box-shadow: var(--shadow-lg);
+    z-index: 50;
+}
+
+.sidebar-header {
+    padding: 1.75rem 1.5rem;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    border-bottom: 1px solid rgba(108, 78, 49, 0.1);
+}
+
+
+
+.logo-image {
+    width: 70px;
+    height: 70px;
+    object-fit: contain;
+    /* OR cover if the image has whitespace */
+    border-radius: 50%;
+    background-color: var(--primary-light);
+    /* Cream background for the black cow */
+    border: 2px solid var(--primary-light);
+    padding: 6px;
+    /* Space inside the circle */
+}
+
+
+
+.brand-name {
+    font-size: 1.5rem;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    color: var(--text-light);
+    /* Cream text on dark brown bg */
+    font-family: 'Inter', sans-serif;
+    line-height: 1.2;
+}
+
+.sidebar-nav {
+    flex: 1;
+    padding: 1.5rem 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.nav-link {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.75rem 1rem;
+    color: var(--text-light);
+    /* Cream color for better visibility */
+    text-decoration: none;
+    border-radius: var(--radius-md);
+    transition: var(--transition);
+    font-weight: 500;
+    opacity: 0.8;
+    /* Slight transparency to distinguish from active state or brand */
+}
+
+.nav-link:hover {
+    background-color: rgba(255, 219, 181, 0.1);
+    /* Subtle peach hover */
+    color: var(--text-light);
+    opacity: 1;
+}
+
+
+.nav-link.active {
+    background-color: var(--primary-light);
+    /* Peach highlight */
+    color: var(--secondary);
+    /* Dark text on light background */
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+
+.sidebar-footer {
+    padding: 1.5rem;
+    border-top: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.user-profile {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.avatar {
+    width: 40px;
+    height: 40px;
+    background-color: var(--primary-light);
+    color: var(--secondary);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+}
+
+.user-info {
+    display: flex;
+    flex-direction: column;
+}
+
+.user-name {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--text-light);
+}
+
+.user-role {
+    font-size: 0.75rem;
+    color: #94a3b8;
+}

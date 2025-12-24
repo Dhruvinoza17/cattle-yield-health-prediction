@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Favicon Generator</title>
+</head>
+
+<body>
+    <img id="source" src="/calf-logo.png" style="display:none;" />
+    <canvas id="canvas" width="128" height="128"></canvas>
+    <script>
+        window.onload = function () {
+            const canvas = document.getElementById('canvas');
+            const ctx = canvas.getContext('2d');
+            const img = document.getElementById('source');
+
+            // Draw circle mask
+            ctx.beginPath();
+            ctx.arc(64, 64, 64, 0, Math.PI * 2, true);
+            ctx.closePath();
+            ctx.clip();
+
+            // Draw image
+            ctx.fillStyle = '#FFEAC5'; // Background cream
+            ctx.fillRect(0, 0, 128, 128);
+            ctx.drawImage(img, 0, 0, 128, 128);
+
+            console.log('Done drawing');
+        };
+    </script>
+    <p>Right click canvas and Save Image As "favicon-final.png" into public folder</p>
+</body>
+
+</html>

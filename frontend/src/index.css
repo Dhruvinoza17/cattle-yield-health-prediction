@@ -1,0 +1,202 @@
+:root {
+  /* Brand Colors - User Palette */
+  --primary: #6C4E31;
+  /* Medium Brown */
+  --primary-dark: #503218;
+  /* Darker Brown for hover */
+  --primary-light: #FFDBB5;
+  /* Peach/Beige */
+  --accent: #FFEAC5;
+  /* Light Cream */
+
+  --secondary: #603F26;
+  /* Dark Brown */
+
+  /* Backgrounds */
+  --bg-body: #FFF8EF;
+  /* Very light version of the cream for main background */
+  --bg-card: #FFFFFF;
+  --bg-sidebar: #603F26;
+  /* Dark Brown */
+
+  /* Text */
+  --text-main: #2D1F10;
+  /* Very dark brown */
+  --text-muted: #856E58;
+  /* Muted earthy tone */
+  --text-light: #FFEAC5;
+  /* Light cream for dark backgrounds */
+
+  /* Status - Adjusted for warmth */
+  --success: #5F8D4E;
+  /* Mossy Green */
+  --warning: #D97706;
+  /* Amber */
+  --danger: #BE123C;
+  /* Rose */
+  --info: #3B82F6;
+  /* Blue */
+
+  /* UI Elements */
+  --radius-sm: 0.5rem;
+  --radius-md: 0.75rem;
+  --radius-lg: 1.5rem;
+
+  --shadow-sm: 0 1px 2px 0 rgb(96 63 38 / 0.05);
+  --shadow-md: 0 4px 6px -1px rgb(96 63 38 / 0.1), 0 2px 4px -2px rgb(96 63 38 / 0.1);
+  --shadow-lg: 0 10px 15px -3px rgb(96 63 38 / 0.1), 0 4px 6px -4px rgb(96 63 38 / 0.1);
+
+  --font-sans: 'Inter', sans-serif;
+  --transition: all 0.2s ease-in-out;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: var(--font-sans);
+  background-color: var(--bg-body);
+  color: var(--text-main);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+button {
+  cursor: pointer;
+  font-family: inherit;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #FFDBB5;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #6C4E31;
+}
+
+/* Utilities */
+.container {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 0 1rem;
+}
+
+.card {
+  background: var(--bg-card);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm);
+  padding: 1.5rem;
+  transition: var(--transition);
+  border: 1px solid rgba(108, 78, 49, 0.05);
+  /* Subtle brown border */
+}
+
+.card:hover {
+  box-shadow: var(--shadow-md);
+  border-color: rgba(108, 78, 49, 0.1);
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.625rem 1.25rem;
+  border-radius: var(--radius-sm);
+  font-weight: 500;
+  border: none;
+  transition: var(--transition);
+  font-size: 0.875rem;
+}
+
+.btn-primary {
+  background-color: var(--primary);
+  color: white;
+}
+
+.btn-primary:hover {
+  background-color: var(--primary-dark);
+}
+
+.btn-outline {
+  background-color: transparent;
+  border: 1px solid var(--primary);
+  color: var(--primary);
+}
+
+.btn-outline:hover {
+  background-color: var(--primary);
+  color: white;
+}
+
+.grid-cols-2 {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 1rem;
+}
+
+.grid-cols-3 {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1rem;
+}
+
+.grid-cols-4 {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1rem;
+}
+
+@media (max-width: 768px) {
+
+  .grid-cols-2,
+  .grid-cols-3,
+  .grid-cols-4 {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Print Styles for Export */
+@media print {
+  .sidebar {
+    display: none !important;
+  }
+
+  /* Reset margin added by layout to accommodate sidebar */
+  .main-content {
+    margin-left: 0 !important;
+    width: 100% !important;
+    padding: 0 !important;
+  }
+
+  /* Hide the export button itself */
+  .btn,
+  button {
+    display: none !important;
+  }
+
+  /* Ensure background colors print */
+  body {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  /* Ensure cards look good on paper */
+  .card {
+    box-shadow: none !important;
+    border: 1px solid #ddd !important;
+    break-inside: avoid;
+  }
+}
