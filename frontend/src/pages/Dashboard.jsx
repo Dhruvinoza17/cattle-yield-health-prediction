@@ -3,6 +3,8 @@ import { Activity, Milk, AlertCircle, TrendingUp, X, MessageCircle } from 'lucid
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend, BarChart, Bar, Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis } from 'recharts';
 import './Dashboard.css';
 import { useChat } from '../context/ChatContext';
+import { auth, db } from '../firebase';
+import { collection, getDocs, onSnapshot, addDoc, serverTimestamp } from 'firebase/firestore';
 
 const StatsCard = ({ title, value, subtext, icon, trend, color }) => (
     <div className="card stats-card">
@@ -24,8 +26,6 @@ const StatsCard = ({ title, value, subtext, icon, trend, color }) => (
 
 const Dashboard = () => {
     const { openChat, setPrefillMessage } = useChat();
-    // const openChat = () => console.log("Chat open placeholder");
-    // const setPrefillMessage = () => console.log("Prefill placeholder");
     const [stats, setStats] = useState({
         totalCattle: 0,
         dailyYield: 0,
@@ -43,103 +43,171 @@ const Dashboard = () => {
 
     const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#ef4444'];
 
-    useEffect(() => {
-        // Fetch real data from history
-        let history = [];
+    const handleLoadDemoData = async () => {
+        if (!auth.currentUser) return;
+        const confirmLoad = window.confirm("Load 5 demo records to visualize graphs?");
+        if (!confirmLoad) return;
+
+        const demoData = [
+            { Animal_ID: 'Cow A1', predictedYield: 12.0, healthStatus: 'Mastitis', riskLevel: 'High', yield: 12.0, disease: 'Mastitis', risk: 'High' },
+            { Animal_ID: 'Cow A2', predictedYield: 10.0, healthStatus: 'Heat Stress', riskLevel: 'High', yield: 10.0, disease: 'Heat Stress', risk: 'High' },
+            { Animal_ID: 'Cow B1', predictedYield: 25.0, healthStatus: 'Healthy', riskLevel: 'Low', yield: 25.0, disease: 'Healthy', risk: 'Low' },
+            { Animal_ID: 'Cow B2', predictedYield: 18.0, healthStatus: 'Healthy', riskLevel: 'Low', yield: 18.0, disease: 'Healthy', risk: 'Low' },
+            { Animal_ID: 'Cow B3', predictedYield: 15.0, healthStatus: 'Healthy', riskLevel: 'Low', yield: 15.0, disease: 'Healthy', risk: 'Low' },
+        ];
+
         try {
-            history = JSON.parse(localStorage.getItem('predictionHistory') || '[]');
-            if (!Array.isArray(history)) history = [];
-        } catch (e) {
-            console.error("Failed to parse history:", e);
-            history = [];
+            for (const record of demoData) {
+                await addDoc(collection(db, "users", auth.currentUser.uid, "cattle_records"), {
+                    ...record,
+                    createdAt: serverTimestamp()
+                });
+            }
+        } catch (error) {
+            console.error("Failed to load demo data", error);
+            alert("Error loading demo data. Check console.");
         }
+    };
 
-        const totalCattle = history.length;
-        const totalYield = history.reduce((acc, curr) => acc + parseFloat(curr.yield || 0), 0);
-        const alerts = history.filter(h => h.risk === 'High');
+    useEffect(() => {
+        let unsubscribe = () => { };
 
-        setStats({
-            totalCattle: totalCattle > 0 ? totalCattle : 0, // In a real app this would be database total
-            dailyYield: totalYield.toFixed(1),
-            alerts: alerts.length,
-            avgYield: totalCattle > 0 ? (totalYield / totalCattle).toFixed(1) : 0
+        const setupListener = (user) => {
+            if (!user) return;
+
+            // Real-time listener
+            unsubscribe = onSnapshot(
+                collection(db, "users", user.uid, "cattle_records"),
+                (querySnapshot) => {
+                    const history = querySnapshot.docs.map(doc => {
+                        const data = doc.data();
+                        return {
+                            id: data.Animal_ID || doc.id,
+                            yield: parseFloat(data.predictedYield || data.yield || 0),
+                            disease: data.healthStatus || data.disease || 'Unknown',
+                            risk: data.riskLevel || data.risk || 'Low',
+                            date: data.createdAt ? data.createdAt.toDate() : new Date(),
+                            ...data
+                        };
+                    });
+
+                    const totalCattle = history.length;
+                    const totalYield = history.reduce((acc, curr) => acc + (curr.yield || 0), 0);
+                    const alerts = history.filter(h => h.risk === 'High');
+
+                    setStats({
+                        totalCattle: totalCattle > 0 ? totalCattle : 0,
+                        dailyYield: totalYield.toFixed(1),
+                        alerts: alerts.length,
+                        avgYield: totalCattle > 0 ? (totalYield / totalCattle).toFixed(1) : 0
+                    });
+
+                    setRecentAlerts(alerts.slice(0, 5));
+
+                    // Prepare Chart Data based on Filter
+                    let limit = filterCount;
+                    if (filterCount === 'All') limit = history.length;
+
+                    // Sort by date descending for "recent" slice, then reverse for chart chronological order
+                    const sortedHistory = [...history].sort((a, b) => new Date(b.date) - new Date(a.date));
+                    const recentHistory = sortedHistory.slice(0, limit).reverse();
+
+                    const data = recentHistory.map(item => ({
+                        name: new Date(item.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                        yield: parseFloat(item.yield),
+                        disease: item.disease
+                    }));
+                    setChartData(data);
+
+                    // Pie Chart Data
+                    const diseaseCounts = {};
+                    history.forEach(h => {
+                        const condition = h.disease || 'Unknown';
+                        diseaseCounts[condition] = (diseaseCounts[condition] || 0) + 1;
+                    });
+                    const pData = Object.keys(diseaseCounts).map((key, index) => ({
+                        name: key,
+                        value: diseaseCounts[key]
+                    }));
+                    setPieData(pData);
+
+                    // Bar Chart Data
+                    const conditionYields = {};
+                    const conditionCounts = {};
+                    const yieldBuckets = { 'Low (<15L)': 0, 'Medium (15-25L)': 0, 'High (>25L)': 0 };
+
+                    history.forEach(h => {
+                        const cond = h.disease || 'Unknown';
+                        const y = parseFloat(h.yield || 0);
+
+                        conditionYields[cond] = (conditionYields[cond] || 0) + y;
+                        conditionCounts[cond] = (conditionCounts[cond] || 0) + 1;
+
+                        if (y < 15) yieldBuckets['Low (<15L)']++;
+                        else if (y <= 25) yieldBuckets['Medium (15-25L)']++;
+                        else yieldBuckets['High (>25L)']++;
+                    });
+
+                    const bData = Object.keys(conditionYields).map(key => ({
+                        name: key,
+                        avgYield: parseFloat((conditionYields[key] / conditionCounts[key]).toFixed(1))
+                    }));
+                    setBarData(bData);
+
+                    // Radar Data
+                    const allDiseases = ['Mastitis', 'Heat Stress', 'Digestive Disorder', 'Healthy'];
+                    setRadarData(allDiseases.map(d => ({
+                        subject: d,
+                        A: diseaseCounts[d] || 0,
+                        fullMark: history.length
+                    })));
+
+                    // Yield Distribution Data
+                    setYieldDistData(Object.keys(yieldBuckets).map(key => ({
+                        range: key,
+                        count: yieldBuckets[key]
+                    })));
+
+                },
+                (error) => {
+                    console.error("Error fetching dashboard data:", error);
+                }
+            );
+        };
+
+        const authUnsub = auth.onAuthStateChanged((user) => {
+            if (user) setupListener(user);
+            else {
+                unsubscribe();
+                setChartData([]);
+                setPieData([]);
+                setBarData([]);
+            }
         });
 
-        setRecentAlerts(alerts.slice(0, 5));
-
-        // Prepare Chart Data based on Filter
-        let limit = filterCount;
-        if (filterCount === 'All') limit = history.length;
-
-        const recentHistory = history.slice(0, limit).reverse();
-        const data = recentHistory.map(item => ({
-            name: new Date(item.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-            yield: parseFloat(item.yield),
-            disease: item.disease
-        }));
-        setChartData(data);
-
-        // --- NEW: Pie Chart Data (Disease Distribution) ---
-        const diseaseCounts = {};
-        history.forEach(h => {
-            const condition = h.disease || 'Unknown';
-            diseaseCounts[condition] = (diseaseCounts[condition] || 0) + 1;
-        });
-        const pData = Object.keys(diseaseCounts).map((key, index) => ({
-            name: key,
-            value: diseaseCounts[key]
-        }));
-        setPieData(pData);
-
-        // --- NEW: Bar Chart Data (Yield by Condition) ---
-        const conditionYields = {};
-        const conditionCounts = {};
-
-        // --- NEW: Radar & Histogram Data Prep ---
-        const yieldBuckets = { 'Low (<15L)': 0, 'Medium (15-25L)': 0, 'High (>25L)': 0 };
-
-        history.forEach(h => {
-            const cond = h.disease || 'Unknown';
-            const y = parseFloat(h.yield || 0);
-
-            // Bar Chart Prep
-            conditionYields[cond] = (conditionYields[cond] || 0) + y;
-            conditionCounts[cond] = (conditionCounts[cond] || 0) + 1;
-
-            // Histogram Prep (Yield Buckets)
-            if (y < 15) yieldBuckets['Low (<15L)']++;
-            else if (y <= 25) yieldBuckets['Medium (15-25L)']++;
-            else yieldBuckets['High (>25L)']++;
-        });
-
-        // Set Bar Data
-        const bData = Object.keys(conditionYields).map(key => ({
-            name: key,
-            avgYield: parseFloat((conditionYields[key] / conditionCounts[key]).toFixed(1))
-        }));
-        setBarData(bData);
-
-        // Set Radar Data (Disease Profile)
-        const allDiseases = ['Mastitis', 'Heat Stress', 'Digestive Disorder', 'Healthy'];
-        setRadarData(allDiseases.map(d => ({
-            subject: d,
-            A: diseaseCounts[d] || 0,
-            fullMark: history.length
-        })));
-
-        // Set Yield Distribution Data (Histogram)
-        setYieldDistData(Object.keys(yieldBuckets).map(key => ({
-            range: key,
-            count: yieldBuckets[key]
-        })));
-
+        return () => {
+            authUnsub();
+            unsubscribe();
+        };
     }, [filterCount]);
 
     return (
         <div className="dashboard">
             <div className="page-header">
                 <h2>Farm Overview</h2>
-                <p>Real-time insights on cattle health and milk production.</p>
+                <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+                    <p>Real-time insights on cattle health and milk production.</p>
+                    {/* Debug/Help Button if stats are 0 */}
+                    {stats.totalCattle === 0 && (
+                        <button
+                            onClick={handleLoadDemoData}
+                            className="btn btn-primary"
+                            style={{ fontSize: '0.8rem', padding: '0.3rem 0.8rem', background: '#ec4899', border: 'none' }}
+                        >
+                            + Load Demo Data
+                        </button>
+                    )}
+                </div>
             </div>
 
             <div className="stats-grid grid-cols-4">
@@ -215,7 +283,10 @@ const Dashboard = () => {
                         </div>
                     ) : (
                         <div className="chart-placeholder">
-                            <p style={{ color: 'var(--text-muted)' }}>No data yet. Run predictions to see trend!</p>
+                            <p style={{ color: 'var(--text-muted)', marginBottom: '1rem' }}>No data yet.</p>
+                            <button onClick={handleLoadDemoData} className="btn btn-outline">
+                                Load Demo Data to Visualize
+                            </button>
                         </div>
                     )}
                 </div>
@@ -250,9 +321,7 @@ const Dashboard = () => {
                 </div>
             </div>
 
-            {/* NEW ANALYTICS ROW */}
             <div className="dashboard-content grid-cols-2" style={{ marginTop: '1.5rem' }}>
-                {/* 1. Health Distribution (Pie Chart) */}
                 <div className="card chart-card">
                     <div className="card-header">
                         <h3>Health Status Distribution</h3>
@@ -287,7 +356,6 @@ const Dashboard = () => {
                     )}
                 </div>
 
-                {/* 2. Yield vs Condition (Bar Chart) */}
                 <div className="card chart-card">
                     <div className="card-header">
                         <h3>Avg. Yield by Condition</h3>
@@ -315,9 +383,8 @@ const Dashboard = () => {
                     )}
                 </div>
             </div>
-            {/* NEW EXTENDED ANALYTICS ROW (Row 3) */}
+
             <div className="dashboard-content grid-cols-2" style={{ marginTop: '1.5rem' }}>
-                {/* 3. Disease Radar (Spider Chart) */}
                 <div className="card chart-card">
                     <div className="card-header">
                         <h3>Disease Risk Profile</h3>
@@ -341,7 +408,6 @@ const Dashboard = () => {
                     )}
                 </div>
 
-                {/* 4. Productivity Groups (Histogram) */}
                 <div className="card chart-card">
                     <div className="card-header">
                         <h3>Productivity Distribution</h3>
@@ -367,7 +433,6 @@ const Dashboard = () => {
             </div>
             <div style={{ marginBottom: '2rem' }}></div>
 
-            {/* Risk Detail Modal */}
             {selectedAlert && (
                 <div style={{
                     position: 'fixed',

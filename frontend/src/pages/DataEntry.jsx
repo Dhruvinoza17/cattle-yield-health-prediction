@@ -1,7 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { db, auth } from '../firebase';
+import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { api } from '../services/api';
-import { Loader, CheckCircle, AlertTriangle } from 'lucide-react';
-import './DataEntry.css';
+import { Loader, AlertTriangle } from 'lucide-react';
+import './DataEntry.css'; // Assuming styles are needed
 
 const DataEntry = () => {
     const [activeTab, setActiveTab] = useState('animal');
@@ -35,6 +37,15 @@ const DataEntry = () => {
         Season: 'Winter',
         Housing_Quality: 'Average'
     });
+
+    useEffect(() => {
+        // Fetch automated ID when component loads
+        const fetchId = async () => {
+            const nextId = await api.getNextId();
+            setFormData(prev => ({ ...prev, Animal_ID: nextId }));
+        };
+        fetchId();
+    }, []);
 
     const handleChange = (e) => {
         const { name, value } = e.target;
@@ -72,8 +83,42 @@ const DataEntry = () => {
                 Humidity: parseInt(formData.Humidity) || 50
             };
 
+            // 1. Get Predictions
             const yieldRes = await api.predictYield(payload);
             const diseaseRes = await api.predictDisease(payload);
+
+            // 2. SAVE TO CSV (Backend) - For Model Training Only
+            try {
+                await api.saveRecord(payload);
+                console.log("Training data synced to backend.");
+            } catch (backendErr) {
+                console.warn("Backend training sync failed (non-critical):", backendErr);
+            }
+
+            // 3. SAVE TO FIREBASE (Cloud) - User specific data
+            if (auth.currentUser) {
+                try {
+                    await addDoc(collection(db, "users", auth.currentUser.uid, "cattle_records"), {
+                        ...payload,
+                        userId: auth.currentUser.uid,
+                        predictedYield: yieldRes.predicted_milk_yield_liters,
+                        healthStatus: diseaseRes.predicted_condition,
+                        riskLevel: diseaseRes.risk_assessment,
+                        createdAt: serverTimestamp()
+                    });
+                    console.log("Record saved to Firebase.");
+                } catch (fbErr) {
+                    console.error("Firebase sync failed:", fbErr);
+                    setError("Failed to save record to cloud.");
+                    // Stop execution if save fails? or just warn?
+                    // User considers this primary storage, so we should probably alert.
+                }
+            } else {
+                console.warn("User not logged in; cannot save record.");
+                setError("You must be logged in to save data.");
+                setLoading(false);
+                return;
+            }
 
             setResult({
                 yield: yieldRes.predicted_milk_yield_liters,
@@ -81,6 +126,8 @@ const DataEntry = () => {
                 risk: diseaseRes.risk_assessment,
                 confidence: diseaseRes.confidence_scores[diseaseRes.predicted_condition] || 0
             });
+
+            console.log("Record saved successfully!");
 
         } catch (err) {
             console.error(err);

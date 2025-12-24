@@ -27,18 +27,38 @@ const PageTitleUpdater = () => {
   return null;
 };
 
+// Protected Route Component
+const ProtectedRoute = ({ children }) => {
+  const token = localStorage.getItem('token');
+  if (!token) {
+    return <Navigate to="/" replace />;
+  }
+  return children;
+};
+
+import Home from './pages/Home';
+
 function App() {
   return (
     <Router>
       <PageTitleUpdater />
       <Routes>
-        <Route path="/" element={<Layout />}>
-          <Route index element={<Dashboard />} />
-          <Route path="data-entry" element={<DataEntry />} />
-          <Route path="predictions" element={<Predictions />} />
-          <Route path="reports" element={<Reports />} />
-          <Route path="*" element={<NotFound />} />
+        {/* Public Routes */}
+        <Route path="/" element={<Home />} />
+
+        {/* Protected Routes (Wrapped in Layout) */}
+        <Route element={
+          <ProtectedRoute>
+            <Layout />
+          </ProtectedRoute>
+        }>
+          <Route path="/dashboard" element={<Dashboard />} />
+          <Route path="/data-entry" element={<DataEntry />} />
+          <Route path="/predictions" element={<Predictions />} />
+          <Route path="/reports" element={<Reports />} />
         </Route>
+
+        <Route path="*" element={<NotFound />} />
       </Routes>
     </Router>
   );

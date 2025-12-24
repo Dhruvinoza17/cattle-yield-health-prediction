@@ -1,97 +1,67 @@
-import React, { useState } from 'react';
-import { Search, AlertTriangle, CheckCircle, Loader, MessageCircle } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Search, AlertTriangle, CheckCircle, Loader, MessageCircle, ArrowLeft, Activity, Thermometer, Weight } from 'lucide-react';
 import { api } from '../services/api';
 import './Predictions.css';
 import { useChat } from '../context/ChatContext';
+import { auth, db } from '../firebase';
+import { collection, onSnapshot, query, orderBy } from 'firebase/firestore';
 
 const Predictions = () => {
     const { openChat, isOpen, setPrefillMessage } = useChat();
-    const [cowId, setCowId] = useState('');
-    const [result, setResult] = useState(null);
-    const [loading, setLoading] = useState(false);
-    const [error, setError] = useState('');
+
+    // State
+    const [animals, setAnimals] = useState([]);
+    const [filteredAnimals, setFilteredAnimals] = useState([]);
+    const [searchTerm, setSearchTerm] = useState('');
+    const [selectedAnimal, setSelectedAnimal] = useState(null);
+    const [loading, setLoading] = useState(true);
+
+    // Fetch Animals from Firestore
+    useEffect(() => {
+        if (!auth.currentUser) return;
+
+        const q = collection(db, "users", auth.currentUser.uid, "cattle_records");
+        const unsubscribe = onSnapshot(q, (snapshot) => {
+            const data = snapshot.docs.map(doc => ({
+                id: doc.data().Animal_ID || doc.id,
+                ...doc.data(),
+                // Normalize data for display
+                yield: parseFloat(doc.data().predictedYield || doc.data().yield || 0).toFixed(1),
+                disease: doc.data().healthStatus || doc.data().disease || 'Unknown',
+                risk: doc.data().riskLevel || doc.data().risk || 'Low',
+                date: doc.data().createdAt ? doc.data().createdAt.toDate() : new Date()
+            }));
+
+            // Sort by date (newest first)
+            const sorted = data.sort((a, b) => b.date - a.date);
+            setAnimals(sorted);
+            setFilteredAnimals(sorted);
+            setLoading(false);
+        });
+
+        return () => unsubscribe();
+    }, []);
+
+    // Search Handler
+    useEffect(() => {
+        if (!searchTerm) {
+            setFilteredAnimals(animals);
+        } else {
+            const lower = searchTerm.toLowerCase();
+            const filtered = animals.filter(a =>
+                a.id.toLowerCase().includes(lower) ||
+                (a.Breed && a.Breed.toLowerCase().includes(lower)) ||
+                (a.disease && a.disease.toLowerCase().includes(lower))
+            );
+            setFilteredAnimals(filtered);
+        }
+    }, [searchTerm, animals]);
 
     const handleSmartChat = () => {
-        if (!result) return;
-        const question = `My cow (ID: ${result.id}) is diagnosed with ${result.disease} with ${result.confidence}% confidence. What specific treatment plan do you recommend?`;
+        if (!selectedAnimal) return;
+        const question = `My cow (ID: ${selectedAnimal.id}) is diagnosed with ${selectedAnimal.disease}. What specific treatment plan do you recommend?`;
         setPrefillMessage(question);
         openChat();
-    };
-
-    const handlePredict = async () => {
-        if (!cowId) return;
-
-        setLoading(true);
-        setError('');
-        setResult(null);
-
-        try {
-            // 1. Fetch Cattle Data
-            const cattleData = await api.getCattle(cowId);
-
-            // Sanitize data: Remove fields that backend Pydantic model doesn't accept
-            // The model expects: Breed, Age, Weight, ..., Housing_Quality
-            // It does NOT want: Animal_ID, Milk_Yield, Disease_Label, or any index columns
-            const { Animal_ID, Milk_Yield, Disease_Label, ...modelInput } = cattleData;
-
-            // FIX: Ensure Humidity and Days_Inside are integers (Backend requires int)
-            if (modelInput.Humidity) modelInput.Humidity = Math.round(modelInput.Humidity);
-            if (modelInput.Days_Inside) modelInput.Days_Inside = Math.round(modelInput.Days_Inside);
-
-            // 2. Predict Yield
-            const yieldRes = await api.predictYield(modelInput);
-
-            // 3. Predict Disease
-            const diseaseRes = await api.predictDisease(modelInput);
-
-            // Save to History
-            saveHistory(cattleData, yieldRes, diseaseRes);
-
-            // Combine results
-            setResult({
-                id: cattleData.Animal_ID,
-                details: {
-                    breed: cattleData.Breed,
-                    age: cattleData.Age,
-                    weight: cattleData.Weight,
-                    feed: cattleData.Feed_Type,
-                    temp: cattleData.Body_Temperature,
-                    activity: cattleData.Walking_Distance ? `${parseFloat(cattleData.Walking_Distance).toFixed(1)} km` : 'N/A'
-                },
-                yield: `${yieldRes.predicted_milk_yield_liters} L`,
-                healthStatus: diseaseRes.risk_assessment === 'High' ? 'Risk Detected' : 'Healthy',
-                riskLevel: diseaseRes.risk_assessment,
-                disease: diseaseRes.predicted_condition,
-                confidence: diseaseRes.confidence_scores[diseaseRes.predicted_condition] || 0,
-                recommendations: getRecommendations(diseaseRes.predicted_condition)
-            });
-
-        } catch (err) {
-            console.error("Prediction Error:", err);
-            let errorMessage = err.message || 'Connection failed';
-
-            if (err.response?.data?.detail) {
-                const detail = err.response.data.detail;
-                errorMessage = typeof detail === 'object' ? JSON.stringify(detail) : detail;
-            }
-
-            setError(`Error details: ${errorMessage}`);
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    const saveHistory = (cattle, yieldRes, diseaseRes) => {
-        const entry = {
-            id: cattle.Animal_ID,
-            date: new Date().toISOString(),
-            yield: yieldRes.predicted_milk_yield_liters,
-            disease: diseaseRes.predicted_condition,
-            risk: diseaseRes.risk_assessment
-        };
-        const history = JSON.parse(localStorage.getItem('predictionHistory') || '[]');
-        history.unshift(entry); // Add to top
-        localStorage.setItem('predictionHistory', JSON.stringify(history.slice(0, 50))); // Keep last 50
     };
 
     const getRecommendations = (condition) => {
@@ -104,128 +74,236 @@ const Predictions = () => {
         }
     };
 
-    return (
-        <div>
-            <div className="page-header">
-                <h2>Health & Yield Predictions</h2>
-                <p>AI-powered analysis for individual cattle.</p>
-            </div>
-
-            <div className="card" style={{ width: '100%', margin: '0 auto' }}>
-                <div style={{ display: 'flex', gap: '1rem', marginBottom: '2rem' }}>
-                    <div style={{ flex: 1, position: 'relative' }}>
-                        <Search size={20} style={{ position: 'absolute', left: '10px', top: '10px', color: '#94a3b8' }} />
-                        <input
-                            type="text"
-                            placeholder="Enter Cow ID (e.g., CATTLE_1042)"
-                            value={cowId}
-                            onChange={(e) => setCowId(e.target.value)}
-                            style={{ width: '100%', padding: '0.6rem 0.6rem 0.6rem 2.5rem', borderRadius: 'var(--radius-sm)', border: '1px solid #cbd5e1' }}
-                        />
-                    </div>
-                    <button className="btn btn-primary" onClick={handlePredict} disabled={loading}>
-                        {loading ? <Loader className="spin" size={18} /> : 'Analyze'}
-                    </button>
+    // RENDER: LIST VIEW
+    if (!selectedAnimal) {
+        return (
+            <div>
+                <div className="page-header">
+                    <h2>My Herd</h2>
+                    <p>Manage and monitor your cattle's health and yield.</p>
                 </div>
 
-                {error && (
-                    <div style={{ padding: '1rem', background: '#fef2f2', color: '#ef4444', borderRadius: 'var(--radius-sm)', marginBottom: '1rem' }}>
-                        {error}
+                <div className="card" style={{ marginBottom: '2rem' }}>
+                    <div style={{ position: 'relative' }}>
+                        <Search size={20} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
+                        <input
+                            type="text"
+                            placeholder="Search by ID, Breed, or Status..."
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                            style={{
+                                width: '100%',
+                                padding: '0.8rem 0.8rem 0.8rem 2.8rem',
+                                borderRadius: '8px',
+                                border: '1px solid #cbd5e1',
+                                fontSize: '1rem',
+                                outline: 'none'
+                            }}
+                        />
                     </div>
-                )}
+                </div>
 
-                {result && (
-                    <div className="prediction-result fade-in">
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-                            <h3>Analysis Results for {result.id}</h3>
-                            <span style={{
-                                padding: '0.25rem 0.75rem',
-                                borderRadius: '1rem',
-                                fontSize: '0.8rem',
-                                fontWeight: '600',
-                                backgroundColor: result.riskLevel === 'High' ? '#fef2f2' : '#f0fdf4',
-                                color: result.riskLevel === 'High' ? '#ef4444' : '#166534'
-                            }}>
-                                {result.healthStatus}
-                            </span>
-                        </div>
-
-                        {/* ANIMAL DETAILS SECTION */}
-                        <h4 style={{ fontSize: '0.9rem', marginBottom: '0.5rem', color: 'var(--text-muted)' }}>Cattle Details</h4>
-                        <div style={{
-                            display: 'grid',
-                            gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))',
-                            gap: '1rem',
-                            marginBottom: '1.5rem',
-                            padding: '1rem',
-                            backgroundColor: '#f8fafc',
-                            borderRadius: 'var(--radius-md)'
-                        }}>
-                            <div><div style={{ fontSize: '0.8rem', color: '#64748b' }}>Breed</div><div style={{ fontWeight: '600' }}>{result.details.breed}</div></div>
-                            <div><div style={{ fontSize: '0.8rem', color: '#64748b' }}>Age</div><div style={{ fontWeight: '600' }}>{result.details.age} Months</div></div>
-                            <div><div style={{ fontSize: '0.8rem', color: '#64748b' }}>Weight</div><div style={{ fontWeight: '600' }}>{result.details.weight} kg</div></div>
-                            <div><div style={{ fontSize: '0.8rem', color: '#64748b' }}>Feed</div><div style={{ fontWeight: '600' }}>{result.details.feed}</div></div>
-                            <div><div style={{ fontSize: '0.8rem', color: '#64748b' }}>Temp</div><div style={{ fontWeight: '600' }}>{result.details.temp}°C</div></div>
-                            <div><div style={{ fontSize: '0.8rem', color: '#64748b' }}>Activity</div><div style={{ fontWeight: '600' }}>{result.details.activity}</div></div>
-                        </div>
-
-                        <div className="grid-cols-2" style={{ marginBottom: '1.5rem' }}>
+                {loading ? (
+                    <div style={{ textAlign: 'center', padding: '2rem' }}><Loader className="spin" /></div>
+                ) : filteredAnimals.length === 0 ? (
+                    <div style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-muted)' }}>
+                        <p>No animals found matching your search.</p>
+                    </div>
+                ) : (
+                    <div className="grid-cols-3" style={{ gap: '1.5rem' }}>
+                        {filteredAnimals.map((animal, idx) => (
                             <div
+                                key={idx}
+                                className="card animal-card"
+                                onClick={() => setSelectedAnimal(animal)}
                                 style={{
-                                    background: '#f0fdf4',
-                                    padding: '1rem',
-                                    borderRadius: 'var(--radius-md)',
-                                    border: '1px solid #dcfce7'
+                                    cursor: 'pointer',
+                                    transition: 'transform 0.2s, box-shadow 0.2s',
+                                    borderLeft: `4px solid ${animal.risk === 'High' ? '#ef4444' : '#10b981'}`
+                                }}
+                                onMouseEnter={(e) => {
+                                    e.currentTarget.style.transform = 'translateY(-4px)';
+                                    e.currentTarget.style.boxShadow = '0 10px 15px -3px rgba(0, 0, 0, 0.1)';
+                                }}
+                                onMouseLeave={(e) => {
+                                    e.currentTarget.style.transform = 'translateY(0)';
+                                    e.currentTarget.style.boxShadow = '0 1px 3px 0 rgba(0, 0, 0, 0.1)';
                                 }}
                             >
-                                <div style={{ fontSize: '0.85rem', color: '#166534' }}>Predicted Yield</div>
-                                <div style={{ fontSize: '1.5rem', fontWeight: '700', color: '#15803d' }}>{result.yield}</div>
-                            </div>
-                            <div
-                                style={{
-                                    background: result.riskLevel === 'High' ? '#fff1f2' : '#f0fdf4',
-                                    padding: '1rem',
-                                    borderRadius: 'var(--radius-md)',
-                                    border: '1px solid #ffe4e6'
-                                }}
-                            >
-                                <div style={{ fontSize: '0.85rem', color: result.riskLevel === 'High' ? '#9f1239' : '#166534' }}>Condition</div>
-                                <div style={{ fontSize: '1.2rem', fontWeight: '700', color: result.riskLevel === 'High' ? '#be123c' : '#15803d' }}>{result.disease}</div>
-                            </div>
-                        </div>
-
-                        {result.riskLevel === 'High' && (
-                            <>
-                                <h4 style={{ fontSize: '0.9rem', marginBottom: '0.5rem', color: 'var(--text-muted)' }}>Detected Issues</h4>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1rem', padding: '0.75rem', background: '#fff', border: '1px solid #e2e8f0', borderRadius: 'var(--radius-sm)' }}>
-                                    <AlertTriangle size={18} color="#ef4444" />
-                                    <span style={{ fontWeight: '600' }}>{result.disease}</span>
-                                    <span style={{ color: '#64748b' }}>- {result.confidence}% Confidence</span>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+                                    <h3 style={{ margin: 0, fontSize: '1.1rem' }}>{animal.id}</h3>
+                                    <span style={{
+                                        fontSize: '0.75rem',
+                                        padding: '0.2rem 0.6rem',
+                                        borderRadius: '12px',
+                                        background: animal.risk === 'High' ? '#fee2e2' : '#dcfce7',
+                                        color: animal.risk === 'High' ? '#ef4444' : '#166534',
+                                        fontWeight: '600'
+                                    }}>
+                                        {animal.disease}
+                                    </span>
                                 </div>
-
-                                {/* Pulsing Action Button */}
-                                {!isOpen && (
-                                    <button className="pulsing-btn" onClick={handleSmartChat}>
-                                        <MessageCircle size={20} />
-                                        Chat with AI about this Risk
-                                    </button>
-                                )}
-                                <div style={{ marginBottom: '2rem' }}></div>
-                            </>
-                        )}
-
-                        <h4 style={{ fontSize: '0.9rem', marginBottom: '0.5rem', color: 'var(--text-muted)' }}>Recommendations</h4>
-                        <ul style={{ listStyle: 'none', padding: 0 }}>
-                            {result.recommendations.map((rec, i) => (
-                                <li key={i} style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.5rem', fontSize: '0.9rem' }}>
-                                    <CheckCircle size={16} color="#10b981" style={{ marginTop: '2px' }} />
-                                    {rec}
-                                </li>
-                            ))}
-                        </ul>
+                                <div style={{ fontSize: '0.9rem', color: '#64748b', marginBottom: '1rem' }}>
+                                    {animal.Breed || 'Unknown Breed'} • {animal.Age ? `${animal.Age} Mo` : 'N/A'}
+                                </div>
+                                <div style={{ display: 'flex', gap: '1rem', marginTop: 'auto', paddingTop: '0.5rem' }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.85rem' }}>
+                                        <Activity size={16} color="var(--primary)" />
+                                        <span>{animal.yield} L</span>
+                                    </div>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.85rem' }}>
+                                        <Weight size={16} color="#f59e0b" />
+                                        <span>{animal.Weight || '-'} kg</span>
+                                    </div>
+                                    {animal.risk === 'High' && (
+                                        <button
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                const question = `My cow (ID: ${animal.id}) is diagnosed with ${animal.disease}. What specific treatment plan do you recommend?`;
+                                                setPrefillMessage(question);
+                                                openChat();
+                                            }}
+                                            className="btn-sm"
+                                            style={{
+                                                marginLeft: 'auto',
+                                                background: '#fee2e2',
+                                                color: '#ef4444',
+                                                border: 'none',
+                                                borderRadius: '50%',
+                                                width: '24px',
+                                                height: '24px',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                justifyContent: 'center',
+                                                cursor: 'pointer'
+                                            }}
+                                            title="Chat about Risk"
+                                        >
+                                            <MessageCircle size={14} />
+                                        </button>
+                                    )}
+                                </div>
+                            </div>
+                        ))}
                     </div>
                 )}
             </div>
+        );
+    }
+
+    // RENDER: DETAIL VIEW (Selected Animal)
+    return (
+        <div className="fade-in">
+            <button
+                onClick={() => setSelectedAnimal(null)}
+                style={{
+                    background: 'none',
+                    border: 'none',
+                    cursor: 'pointer',
+                    padding: '0.5rem',
+                    marginBottom: '1rem',
+                    display: 'flex',
+                    alignItems: 'center',
+                    color: 'var(--text-main)',
+                    transition: 'transform 0.2s',
+                    marginTop: '-10px'
+                }}
+                onMouseEnter={(e) => e.target.style.transform = 'translateX(-5px)'}
+                onMouseLeave={(e) => e.target.style.transform = 'translateX(0)'}
+                title="Back to Herd"
+            >
+                <ArrowLeft size={32} />
+            </button>
+
+            <div className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                    <h2>{selectedAnimal.id} Details</h2>
+                    <span style={{
+                        padding: '0.25rem 0.75rem',
+                        borderRadius: '1rem',
+                        fontSize: '0.9rem',
+                        fontWeight: '600',
+                        backgroundColor: selectedAnimal.risk === 'High' ? '#fef2f2' : '#f0fdf4',
+                        color: selectedAnimal.risk === 'High' ? '#ef4444' : '#166534'
+                    }}>
+                        {selectedAnimal.disease}
+                    </span>
+                </div>
+                {selectedAnimal.risk === 'High' && (
+                    <button
+                        onClick={() => {
+                            const question = `My cow (ID: ${selectedAnimal.id}) is diagnosed with ${selectedAnimal.disease}. What specific treatment plan do you recommend?`;
+                            setPrefillMessage(question);
+                            openChat();
+                        }}
+                        className="btn btn-primary"
+                        style={{ padding: '0.5rem 1rem', fontSize: '0.9rem', display: 'flex', gap: '0.5rem', background: '#ef4444', border: 'none' }}
+                    >
+                        <MessageCircle size={18} /> Chat with AI
+                    </button>
+                )}
+            </div>
+
+            <div className="card">
+                {/* DETAILS GRID */}
+                <h4 style={{ fontSize: '0.9rem', marginBottom: '0.5rem', color: 'var(--text-muted)' }}>Cattle Information</h4>
+                <div style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))',
+                    gap: '1rem',
+                    marginBottom: '1.5rem',
+                    padding: '1rem',
+                    backgroundColor: '#f8fafc',
+                    borderRadius: '8px'
+                }}>
+                    <div><div className="detail-label">Breed</div><div className="detail-value">{selectedAnimal.Breed || '-'}</div></div>
+                    <div><div className="detail-label">Age</div><div className="detail-value">{selectedAnimal.Age || '-'} Months</div></div>
+                    <div><div className="detail-label">Weight</div><div className="detail-value">{selectedAnimal.Weight || '-'} kg</div></div>
+                    <div><div className="detail-label">Feed</div><div className="detail-value">{selectedAnimal.Feed_Type || '-'}</div></div>
+                    <div><div className="detail-label">Temperature</div><div className="detail-value">{selectedAnimal.Body_Temperature || '-'}°C</div></div>
+                    <div><div className="detail-label">Last Updated</div><div className="detail-value">{new Date(selectedAnimal.date).toLocaleDateString()}</div></div>
+                </div>
+
+                <div className="grid-cols-2" style={{ marginBottom: '1.5rem', gap: '2rem' }}>
+                    <div style={{ background: '#f0fdf4', padding: '1.5rem', borderRadius: '12px', border: '1px solid #dcfce7' }}>
+                        <div style={{ fontSize: '0.9rem', color: '#166534', marginBottom: '0.5rem' }}>Predicted Yield</div>
+                        <div style={{ fontSize: '2rem', fontWeight: '700', color: '#15803d' }}>{selectedAnimal.yield} L</div>
+                    </div>
+                    <div style={{ background: selectedAnimal.risk === 'High' ? '#fff1f2' : '#f0fdf4', padding: '1.5rem', borderRadius: '12px', border: `1px solid ${selectedAnimal.risk === 'High' ? '#ffe4e6' : '#dcfce7'}` }}>
+                        <div style={{ fontSize: '0.9rem', color: selectedAnimal.risk === 'High' ? '#9f1239' : '#166534', marginBottom: '0.5rem' }}>Health Status</div>
+                        <div style={{ fontSize: '2rem', fontWeight: '700', color: selectedAnimal.risk === 'High' ? '#be123c' : '#15803d' }}>{selectedAnimal.disease}</div>
+                    </div>
+                </div>
+
+                {selectedAnimal.risk === 'High' && (
+                    <>
+                        <h4 style={{ fontSize: '0.9rem', marginBottom: '0.5rem', color: 'var(--text-muted)' }}>Action Required</h4>
+                        <div style={{ marginBottom: '1.5rem' }}>
+                            {!isOpen && (
+                                <button className="pulsing-btn" onClick={handleSmartChat}>
+                                    <MessageCircle size={20} />
+                                    Chat with AI about {selectedAnimal.id}
+                                </button>
+                            )}
+                        </div>
+                    </>
+                )}
+
+                <h4 style={{ fontSize: '0.9rem', marginBottom: '0.5rem', color: 'var(--text-muted)' }}>Recommendations</h4>
+                <ul style={{ listStyle: 'none', padding: 0 }}>
+                    {getRecommendations(selectedAnimal.disease).map((rec, i) => (
+                        <li key={i} style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.5rem', fontSize: '0.95rem' }}>
+                            <CheckCircle size={18} color="#10b981" style={{ marginTop: '2px', flexShrink: 0 }} />
+                            {rec}
+                        </li>
+                    ))}
+                </ul>
+            </div>
+
+            <style jsx>{`
+                .detail-label { font-size: 0.8rem; color: #64748b; margin-bottom: 2px; }
+                .detail-value { font-weight: 600; color: #334155; }
+            `}</style>
         </div>
     );
 };

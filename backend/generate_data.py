@@ -25,7 +25,7 @@ def generate_cattle_data(num_samples=500):
     
     for i in range(num_samples):
         # ... existing animal data ...
-        animal_id = f"CATTLE_{random.randint(1000, 9999)}"
+        animal_id = f"CATTLE_{1000 + i}"
         breed = random.choice(breeds)
         
         # Breed specific baselines for yield

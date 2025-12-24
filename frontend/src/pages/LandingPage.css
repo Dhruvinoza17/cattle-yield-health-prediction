@@ -1,0 +1,203 @@
+/* LandingPage.css */
+
+/* --- Variables based on Prompt --- */
+:root {
+    --lp-bg: #FFEAC5;
+    /* 40% usage */
+    --lp-card: #FFD8B5;
+    /* 25% usage */
+    --lp-primary: #6C4E31;
+    /* 20% usage - Accent/Text */
+    --lp-secondary: #603F26;
+    /* 15% usage - Darker Accent */
+    --lp-glass: rgba(255, 255, 255, 0.4);
+    --lp-glass-border: rgba(255, 255, 255, 0.6);
+}
+
+.lp-container {
+    background-color: var(--lp-bg);
+    color: var(--lp-primary);
+    font-family: 'Inter', sans-serif;
+    overflow-x: hidden;
+    min-height: 100vh;
+}
+
+/* Typography */
+.lp-h1 {
+    font-size: 3.5rem;
+    font-weight: 900;
+    line-height: 1.1;
+    color: var(--lp-secondary);
+    letter-spacing: -0.02em;
+}
+
+.lp-h2 {
+    font-size: 2.5rem;
+    font-weight: 800;
+    margin-bottom: 2rem;
+    text-align: center;
+    color: var(--lp-secondary);
+}
+
+.lp-h3 {
+    font-size: 1.5rem;
+    font-weight: 700;
+    margin-bottom: 0.5rem;
+    color: var(--lp-secondary);
+}
+
+.lp-text {
+    font-size: 1.125rem;
+    line-height: 1.6;
+    color: var(--lp-primary);
+    opacity: 0.9;
+}
+
+/* Glassmorphism Cards */
+.lp-card {
+    background: var(--lp-card);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    border-radius: 1.5rem;
+    padding: 2rem;
+    backdrop-filter: blur(10px);
+    box-shadow: 0 10px 30px -5px rgba(96, 63, 38, 0.1);
+    transition: all 0.3s ease;
+}
+
+.lp-glass-modal {
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 2px solid var(--lp-primary);
+    box-shadow: 0 40px 60px -15px rgba(96, 63, 38, 0.3);
+    border-radius: 2rem;
+}
+
+/* Buttons */
+.lp-btn-primary {
+    background: var(--lp-primary);
+    color: #FFEAC5;
+    padding: 1rem 2rem;
+    border-radius: 50px;
+    font-weight: 700;
+    border: none;
+    cursor: pointer;
+    box-shadow: 0 4px 15px rgba(108, 78, 49, 0.3);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.lp-btn-primary:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 10px 25px rgba(108, 78, 49, 0.4);
+    background: var(--lp-secondary);
+}
+
+.lp-btn-secondary {
+    background: transparent;
+    border: 2px solid var(--lp-primary);
+    color: var(--lp-primary);
+    padding: 0.9rem 1.9rem;
+    border-radius: 50px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.lp-btn-secondary:hover {
+    background: rgba(108, 78, 49, 0.1);
+    transform: translateY(-2px);
+}
+
+/* Hero 3D Placeholder (CSS 3D) */
+.cow-3d-model {
+    width: 300px;
+    height: 300px;
+    background: radial-gradient(circle at 30% 30%, #6C4E31, #603F26);
+    border-radius: 40% 60% 70% 30% / 40% 50% 60% 50%;
+    animation: morph 8s ease-in-out infinite;
+    position: relative;
+    box-shadow: 20px 20px 60px rgba(96, 63, 38, 0.3),
+        inset -10px -10px 30px rgba(0, 0, 0, 0.2);
+}
+
+@keyframes morph {
+
+    0%,
+    100% {
+        border-radius: 40% 60% 70% 30% / 40% 50% 60% 50%;
+        transform: rotate(0deg);
+    }
+
+    34% {
+        border-radius: 70% 30% 50% 50% / 30% 30% 70% 70%;
+        transform: rotate(5deg);
+    }
+
+    67% {
+        border-radius: 100% 60% 60% 100% / 100% 100% 60% 60%;
+        transform: rotate(-5deg);
+    }
+}
+
+/* Inputs */
+.lp-input {
+    width: 100%;
+    padding: 1rem;
+    border-radius: 0.75rem;
+    border: 1px solid rgba(108, 78, 49, 0.2);
+    background: rgba(255, 255, 255, 0.5);
+    color: var(--lp-primary);
+    outline: none;
+    transition: all 0.2s;
+}
+
+.lp-input:focus {
+    border-color: var(--lp-primary);
+    background: rgba(255, 255, 255, 0.8);
+    box-shadow: 0 0 0 3px rgba(108, 78, 49, 0.1);
+}
+
+/* Accents */
+.lp-accent-bg {
+    background: var(--lp-primary);
+    color: var(--lp-bg);
+}
+
+/* Navbar */
+.lp-navbar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    padding: 1.5rem 2rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    z-index: 50;
+    transition: all 0.3s;
+    background: rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(8px);
+    border-bottom: 1px solid rgba(108, 78, 49, 0.1);
+}
+
+.lp-navbar.scrolled {
+    background: rgba(255, 234, 197, 0.9);
+    backdrop-filter: blur(10px);
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+}
+
+/* Mobile */
+@media (max-width: 768px) {
+    .lp-h1 {
+        font-size: 2.5rem;
+    }
+
+    .hero-grid {
+        grid-template-columns: 1fr !important;
+        text-align: center;
+    }
+
+    .cow-3d-wrapper {
+        margin: 2rem auto;
+    }
+}

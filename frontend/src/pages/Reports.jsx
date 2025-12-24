@@ -1,14 +1,55 @@
 import React, { useState, useEffect } from 'react';
 import { Download, FileText, Filter, TrendingUp, AlertTriangle } from 'lucide-react';
+import { auth, db } from '../firebase';
+import { collection, getDocs, orderBy, query, onSnapshot } from 'firebase/firestore';
 
 const Reports = () => {
     const [history, setHistory] = useState([]);
     const [filter, setFilter] = useState('all');
 
     useEffect(() => {
-        // Load history from local storage (saved by Predictions.jsx)
-        const savedHistory = JSON.parse(localStorage.getItem('predictionHistory') || '[]');
-        setHistory(savedHistory);
+        let unsubscribe = () => { };
+
+        const setupListener = () => {
+            if (!auth.currentUser) return;
+
+            const q = collection(db, "users", auth.currentUser.uid, "cattle_records");
+
+            // Real-time listener for Reports
+            unsubscribe = onSnapshot(q, (querySnapshot) => {
+                const data = querySnapshot.docs.map(doc => {
+                    const d = doc.data();
+                    return {
+                        id: d.Animal_ID || 'Unknown',
+                        // Robust mapping
+                        yield: parseFloat(d.predictedYield || d.yield || 0).toFixed(1),
+                        disease: d.healthStatus || d.disease || 'N/A',
+                        risk: d.riskLevel || d.risk || 'Low',
+                        date: d.createdAt ? d.createdAt.toDate() : new Date(),
+                        ...d
+                    };
+                });
+
+                // Sort client-side to assume latest first (safer than Firestore orderBy without index)
+                const sortedData = data.sort((a, b) => b.date - a.date);
+                setHistory(sortedData);
+            }, (error) => {
+                console.error("Error fetching reports:", error);
+            });
+        };
+
+        const authUnsub = auth.onAuthStateChanged((user) => {
+            if (user) setupListener();
+            else {
+                setHistory([]);
+                unsubscribe();
+            }
+        });
+
+        return () => {
+            authUnsub();
+            unsubscribe();
+        };
     }, []);
 
     const exportPDF = () => {
