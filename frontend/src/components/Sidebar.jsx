@@ -52,6 +52,8 @@ const Sidebar = () => {
   const handleLogout = async () => {
     try {
       await signOut(auth);
+      localStorage.removeItem('token'); // Clear session token
+      localStorage.removeItem('user');  // Clear any other user data
       navigate('/'); // Redirect to Landing Page
     } catch (error) {
       console.error("Logout Error:", error);

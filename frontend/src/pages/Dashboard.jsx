@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Activity, Milk, AlertCircle, TrendingUp, X, MessageCircle } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend, BarChart, Bar, Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis } from 'recharts';
 import './Dashboard.css';
@@ -25,6 +26,7 @@ const StatsCard = ({ title, value, subtext, icon, trend, color }) => (
 );
 
 const Dashboard = () => {
+    const navigate = useNavigate();
     const { openChat, setPrefillMessage } = useChat();
     const [stats, setStats] = useState({
         totalCattle: 0,
@@ -179,9 +181,8 @@ const Dashboard = () => {
             if (user) setupListener(user);
             else {
                 unsubscribe();
-                setChartData([]);
-                setPieData([]);
-                setBarData([]);
+                localStorage.removeItem('token');
+                navigate('/');
             }
         });
 
