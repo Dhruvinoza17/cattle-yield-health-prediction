@@ -1,6 +1,6 @@
 import React from 'react';
-import { NavLink, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, Database, Activity, FileText, Settings, LogOut } from 'lucide-react';
+import { useNavigate, useLocation, NavLink } from 'react-router-dom';
+import { LayoutDashboard, FileText, Activity, LogOut, Database, X } from 'lucide-react';
 import { auth, db } from '../firebase';
 import { signOut } from 'firebase/auth';
 import { doc, getDoc } from 'firebase/firestore';
@@ -8,10 +8,11 @@ import './Sidebar.css';
 
 import EditProfileModal from './EditProfileModal';
 
-const Sidebar = () => {
+const Sidebar = ({ isOpen, onClose }) => {
   const navigate = useNavigate();
+  const location = useLocation();
   const [userName, setUserName] = React.useState('Loading...');
-  const [userRole, setUserRole] = React.useState('Farm Owner'); // Dynamically could be fetched too
+  const [userRole, setUserRole] = React.useState('Farm Owner');
   const [fullUserData, setFullUserData] = React.useState(null);
   const [dateTime, setDateTime] = React.useState(new Date());
   const [isModalOpen, setIsModalOpen] = React.useState(false);
@@ -76,10 +77,13 @@ const Sidebar = () => {
 
   return (
     <>
-      <aside className="sidebar">
+      <aside className={`sidebar ${isOpen ? 'open' : ''}`}>
         <div className="sidebar-header">
           <img src="/calf-logo.png" alt="Calf AI Logo" className="logo-image" />
           <h1 className="brand-name">Calf AI</h1>
+          <button className="mobile-close-btn" onClick={onClose}>
+            <X size={24} />
+          </button>
         </div>
 
         <nav className="sidebar-nav">

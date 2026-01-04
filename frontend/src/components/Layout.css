@@ -1,29 +1,50 @@
 .app-container {
     display: flex;
     min-height: 100vh;
+    position: relative;
+    /* For absolute positioning of overlay */
 }
 
 .main-content {
     flex: 1;
     margin-left: 260px;
-    /* Width of sidebar */
+    /* Desktop Sidebar Width */
     background-color: var(--bg-body);
     display: flex;
     flex-direction: column;
+    transition: margin-left 0.3s ease;
+    /* Smooth transition if resized */
+    min-height: 100vh;
 }
 
 .top-bar {
     height: 70px;
     background-color: var(--bg-card);
     border-bottom: 1px solid #e2e8f0;
-    display: flex;
+    display: none;
+    /* Hidden on Desktop by default */
     align-items: center;
-    justify-content: flex-end;
-    /* Just date for now */
     padding: 0 2rem;
+    /* Will be adjusted for mobile */
     position: sticky;
     top: 0;
     z-index: 40;
+}
+
+.mobile-menu-btn {
+    display: none;
+    /* Hidden on Desktop */
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: var(--primary);
+    padding: 0.5rem;
+    margin-right: 1rem;
+    border-radius: var(--radius-sm);
+}
+
+.mobile-menu-btn:hover {
+    background-color: var(--bg-body);
 }
 
 .date-display {
@@ -38,9 +59,52 @@
     overflow-y: auto;
 }
 
+/* --- MOBILE RESPONSIVENESS --- */
 @media (max-width: 1024px) {
     .main-content {
         margin-left: 0;
-        /* Should handle mobile later, for now desktop focus */
+        /* Full width on mobile */
+        width: 100%;
+        padding-top: 0;
+        /* Top bar handles spacing */
+    }
+
+    .top-bar {
+        display: flex;
+        /* Show on mobile */
+        padding: 0 1rem;
+        justify-content: space-between;
+    }
+
+    .mobile-menu-btn {
+        display: flex;
+        /* Show hamburger */
+        align-items: center;
+        justify-content: center;
+    }
+
+    .date-display {
+        font-size: 0.8rem;
+        /* Smaller text */
+    }
+
+    .content-area {
+        padding: 1rem;
+        /* Less padding on mobile content */
+    }
+
+    /* Overlay for when Sidebar is open */
+    .mobile-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background-color: rgba(0, 0, 0, 0.5);
+        /* Semi-transparent black */
+        backdrop-filter: blur(2px);
+        /* Blur effect */
+        z-index: 45;
+        /* Below Sidebar (50) but above everything else */
     }
 }

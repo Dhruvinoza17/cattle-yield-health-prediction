@@ -11,6 +11,7 @@
     border-right: 1px solid rgba(255, 255, 255, 0.05);
     box-shadow: var(--shadow-lg);
     z-index: 50;
+    transition: transform 0.3s ease-in-out;
 }
 
 .sidebar-header {
@@ -19,31 +20,37 @@
     align-items: center;
     gap: 1rem;
     border-bottom: 1px solid rgba(108, 78, 49, 0.1);
+    position: relative;
+    /* For close button positioning */
 }
 
-
+/* Mobile Close Button - Hidden on Desktop */
+.mobile-close-btn {
+    display: none;
+    background: none;
+    border: none;
+    color: var(--text-light);
+    position: absolute;
+    right: 1rem;
+    cursor: pointer;
+}
 
 .logo-image {
-    width: 70px;
-    height: 70px;
+    width: 60px;
+    /* Slightly smaller for better fit */
+    height: 60px;
     object-fit: contain;
-    /* OR cover if the image has whitespace */
     border-radius: 50%;
     background-color: var(--primary-light);
-    /* Cream background for the black cow */
     border: 2px solid var(--primary-light);
-    padding: 6px;
-    /* Space inside the circle */
+    padding: 4px;
 }
-
-
 
 .brand-name {
     font-size: 1.5rem;
     font-weight: 700;
     letter-spacing: -0.01em;
     color: var(--text-light);
-    /* Cream text on dark brown bg */
     font-family: 'Inter', sans-serif;
     line-height: 1.2;
 }
@@ -54,6 +61,8 @@
     display: flex;
     flex-direction: column;
     gap: 0.5rem;
+    overflow-y: auto;
+    /* Allow scroll if screen is short */
 }
 
 .nav-link {
@@ -62,31 +71,25 @@
     gap: 0.75rem;
     padding: 0.75rem 1rem;
     color: var(--text-light);
-    /* Cream color for better visibility */
     text-decoration: none;
     border-radius: var(--radius-md);
     transition: var(--transition);
     font-weight: 500;
     opacity: 0.8;
-    /* Slight transparency to distinguish from active state or brand */
 }
 
 .nav-link:hover {
     background-color: rgba(255, 219, 181, 0.1);
-    /* Subtle peach hover */
     color: var(--text-light);
     opacity: 1;
 }
 
-
 .nav-link.active {
     background-color: var(--primary-light);
-    /* Peach highlight */
     color: var(--secondary);
-    /* Dark text on light background */
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+    font-weight: 600;
 }
-
 
 .sidebar-footer {
     padding: 1.5rem;
@@ -125,4 +128,26 @@
 .user-role {
     font-size: 0.75rem;
     color: #94a3b8;
+}
+
+/* --- MOBILE RESPONSIVENESS --- */
+@media (max-width: 1024px) {
+    .sidebar {
+        transform: translateX(-100%);
+        /* Hide by default */
+        width: 80%;
+        /* Wider on mobile for better touch */
+        max-width: 300px;
+    }
+
+    .sidebar.open {
+        transform: translateX(0);
+        /* Slide in */
+    }
+
+    .mobile-close-btn {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
 }

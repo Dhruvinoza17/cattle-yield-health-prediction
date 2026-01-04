@@ -10,6 +10,12 @@
     display: flex;
     border-bottom: 1px solid #e2e8f0;
     margin-bottom: 2rem;
+    overflow-x: auto;
+    white-space: nowrap;
+    -webkit-overflow-scrolling: touch;
+    /* Smooth scroll on iOS */
+    padding-bottom: 2px;
+    /* Prevent scrollbar overlap */
 }
 
 .tab-btn {
